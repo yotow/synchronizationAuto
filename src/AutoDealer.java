@@ -1,65 +1,73 @@
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class AutoDealer {
+
+    ReentrantLock providerLoker = new ReentrantLock();
+    Condition condition = providerLoker.newCondition();
 
     static final Toyota toyotaProvider = new Toyota();
     static final Nissan nissanProvider = new Nissan();
 
     static final List<Car> toyotaCars = new ArrayList<>();
     static final List<Car> nissanCars = new ArrayList<>();
-    private static final int CREATE_ORDER_TIME = 1000;
-    private static final int DELIVERED_TIME = 1000;
+    private static final int CREATE_ORDER_TIME = 500;
 
-
-    public synchronized Car sellCar(String label) {
-        AutoManufacture provider = null;
-        List<Car> currentList = null;
-        if(label.equals(Toyota.LABEL)){
-            provider = toyotaProvider;
-            currentList = toyotaCars;
-        } else if (label.equals(Nissan.LABEL)) {
-            provider = nissanProvider;
-            currentList = nissanCars;
-        }
+    public Car sellCar(String label) {
+        AutoManufacture provider = determineProvider(label);
+        List<Car> currentList = determineList(label);
 
         System.out.println("Салон: Заявка на покупку  " + provider.getLabelName() + "  принята");
 
+        providerLoker.lock();
         try {
             Thread.sleep(CREATE_ORDER_TIME);
             while (currentList.isEmpty()) {
                 System.out.println("Салон: " + provider.getLabelName() + " пока нет, ожидайте");
-                wait(2000);
+                condition.await();
             }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
+        } finally {
+            providerLoker.unlock();
         }
-
         System.out.println("Салон:  " + provider.getLabelName() + "  продана");
         return currentList.remove(0);
     }
 
-    public synchronized void receiveToyota() {
-        System.out.println("Салон: ожидает " + Toyota.LABEL);
-        toyotaCars.add(toyotaProvider.supply());
-        notifyAll();
+
+    public void receiveCar(String label) {
+        AutoManufacture provider = determineProvider(label);
+        List<Car> currentList = determineList(label);
+
+        providerLoker.lock();
         try {
-            Thread.sleep(DELIVERED_TIME);
-        } catch (InterruptedException e) {
+            System.out.println("Салон: заказал " + provider.label);
+            currentList.add(provider.supply());
+            condition.signal();
+            System.out.println("Салон: приняли " + provider.label);
+        } catch (IllegalMonitorStateException e) {
             throw new RuntimeException(e);
+        } finally {
+            providerLoker.unlock();
         }
-        System.out.println("Салон: приняли " + Toyota.LABEL);
     }
 
-    public synchronized void receiveNissan() {
-        System.out.println("Салон: ожидает " + Nissan.LABEL);
-        nissanCars.add(nissanProvider.supply());
-        notifyAll();
-        try {
-            Thread.sleep(DELIVERED_TIME);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+    private List<Car> determineList(String label) {
+        if (label.equals(Toyota.LABEL)) {
+            return toyotaCars;
+        } else {
+            return nissanCars;
         }
-        System.out.println("Салон: приняли " + Nissan.LABEL);
+    }
+
+    private AutoManufacture determineProvider(String label) {
+        if (label.equals(Toyota.LABEL)) {
+            return toyotaProvider;
+        } else {
+            return nissanProvider;
+        }
     }
 }

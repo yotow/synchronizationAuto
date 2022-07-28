@@ -1,6 +1,11 @@
 import java.util.Stack;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Main {
+
+    public static final int WAIT = 2000;
+
     public static void main(String[] args) throws InterruptedException {
         Stack<Client> clients = new Stack<>();
 
@@ -18,18 +23,23 @@ public class Main {
 
         AutoDealer dealer = new AutoDealer();
 
-        Runnable toyotaReceiver = dealer::receiveToyota;
-        Runnable nissanReceiver = dealer::receiveNissan;
-
-
-        for (int i = 0; i < 5; i++) {
-            new Thread(null, toyotaReceiver).start();
-            new Thread(null, nissanReceiver).start();
-        }
+        ExecutorService service = Executors.newFixedThreadPool(1);
+        ExecutorService service2 = Executors.newFixedThreadPool(1);
 
         for (int i = 0; i < 5; i++) {
-            new Thread(null, () -> clients.pop().buyCar(dealer, Toyota.LABEL)).start();
-            new Thread(null, () -> clients.pop().buyCar(dealer, Nissan.LABEL)).start();
+            service2.submit(() -> clients.pop().buyCar(dealer, Nissan.LABEL));
+            service2.submit(() -> clients.pop().buyCar(dealer, Toyota.LABEL));
+            Thread.sleep(WAIT);
+
+            service.submit(() -> dealer.receiveCar(Nissan.LABEL));
+
+            Thread.sleep(WAIT);
+
+            service.submit(() -> dealer.receiveCar(Toyota.LABEL));
+            //new Thread(null, () -> dealer.receiveCar(Toyota.LABEL)).start();
+            //new Thread(null, () -> dealer.receiveCar(Nissan.LABEL)).start();
         }
+        service.shutdown();
+        service2.shutdown();
     }
 }
