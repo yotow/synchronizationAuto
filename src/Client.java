@@ -15,7 +15,7 @@ public class Client {
     }
 
     public void buyCar(AutoDealer dealer, String label) {
-        System.out.println("Клиент: " + name + " заказал " + label);
+        System.out.println("Клиент: " + name + " решил купить " + label);
         car = dealer.sellCar(label);
         if (car != null)
             System.out.println("++++++Клиент: " + getName() + " уехал на " + getCar().getLabel());
